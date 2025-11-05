@@ -1,295 +1,159 @@
-// Базовый класс пользователя
-public abstract class User
-{
-    protected string UserId { get; set; }
-    protected string Phone { get; set; }
-    protected string Name { get; set; }
+using System;
+using System.Collections.Generic;
 
-    public abstract void Register();
-    public abstract void Login();
+public class User
+{
+    protected string UserId;
+    protected string phone;
+    protected string name;
+
+    public void Register() { }
+    public void Login() { }
 }
 
-// Класс заказчика
 public class Customer : User
 {
-    public List<string> PaymentMethods { get; set; } = new List<string>();
+    public string paymentMethods;
 
-    public override void Register()
+    public Order CreateOrder()
     {
-        Console.WriteLine("Customer registered");
-    }
-
-    public override void Login()
-    {
-        Console.WriteLine("Customer logged in");
-    }
-
-    public Order CreateOrder(OrderData orderData)
-    {
-        var orderService = new OrderService();
-        return orderService.CreateOrder(this, orderData);
-    }
-
-    private void RateOrder(int rating, string comment) { /* реализация */ }
-    private void CancelOrder() { /* реализация */ }
-    public Tariff GetTariff() => new TariffService().GetTariffInfo(this);
-}
-
-// Класс заказа
-public class Order
-{
-    public string OrderId { get; set; } = Guid.NewGuid().ToString();
-    public string Tariff { get; set; }
-    public decimal Time { get; set; }
-    public string Status { get; set; } = "Created";
-    public decimal Price { get; set; }
-
-    public void SetInfo(OrderData orderData)
-    {
-        this.Tariff = orderData.TariffName;
-        this.Time = orderData.Time;
-    }
-
-    public string GetStatus() => Status;
-
-    public void UpdateOrderStatus(string newStatus)
-    {
-        Status = newStatus;
-        Console.WriteLine($"Order {OrderId} status: {newStatus}");
-    }
-}
-
-// Сервис создания заказа
-public class OrderService
-{
-    public Order CreateOrder(Customer customer, OrderData orderData)
-    {
-        Console.WriteLine("Creating order...");
+        Order newOrder = new Order();
+        TaxiDriver driver = new TaxiDriver();
         
-        // Создание заказа
-        var order = new Order();
-        order.SetInfo(orderData);
-        
-        // Расчет цены
-        var priceCalculator = new PriceCalculator();
-        order.Price = priceCalculator.GetPrice(order);
-        
-        // Поиск водителя
-        var driverService = new DriverService();
-        var driverFound = driverService.FindDriver(order);
-        
-        if (driverFound)
+        string availableDrivers = driver.GetAvailableDrivers();
+        if (!string.IsNullOrEmpty(availableDrivers))
         {
-            order.UpdateOrderStatus("Driver Found");
-            GenerateReceipt(order);
-            return order;
+            newOrder.status = "Назначен";
         }
         else
         {
-            order.UpdateOrderStatus("No Driver Available");
-            throw new Exception("No available drivers");
+            newOrder.status = "Ожидание водителя";
         }
+        
+        return newOrder;
     }
-    
-    private void GenerateReceipt(Order order)
+
+    private void RateOrder(int rating, string comment)
     {
-        var receipt = new Receipt(order);
-        Console.WriteLine($"Receipt generated for order {order.OrderId}");
+        Review review = new Review();
+        review.rating = rating;
+        review.comment = comment;
+        review.date = DateTime.Now;
+        review.CreateReview();
+    }
+
+    private void CancelOrder()
+    {
+        Order order = new Order();
+        order.status = "Отменен";
+    }
+
+    public Tariff GetTariff()
+    {
+        return new Tariff();
     }
 }
 
-// Класс расчета цен
+public class Review
+{
+    private string reviewId;
+    public int rating;
+    public string comment;
+    public DateTime date;
+
+    public void CreateReview() { }
+    public float GetRating() { return rating; }
+}
+
 public class PriceCalculator
 {
-    private string calculationId = Guid.NewGuid().ToString();
+    private string calculationId;
 
-    public decimal GetPrice(Order order)
+    public float GetPrice(Order order)
     {
-        var tariffService = new TariffService();
-        var tariff = tariffService.GetTariffByName(order.Tariff);
-        return ApplyTariff(tariff, order.Time);
+        float basePrice = 100.0f;
+        float tariffMultiplier = ApplyTariff(order.tariff);
+        return basePrice * tariffMultiplier;
     }
 
-    public decimal ApplyTariff(Tariff tariff, decimal time)
+    public float ApplyTariff(string tariff)
     {
-        return tariff.CalculatePrice(0, time);
+        if (tariff == "Эконом") return 1.0f;
+        if (tariff == "Комфорт") return 1.5f;
+        if (tariff == "Бизнес") return 2.0f;
+        return 1.0f;
     }
 
-    private decimal CalculateFinalPrice() => 0m;
+    private float CalculateFinalPrice()
+    {
+        return 0.0f;
+    }
 }
 
-// Класс тарифа
-public class Tariff
+public class Order
 {
-    public string TariffId { get; set; } = Guid.NewGuid().ToString();
-    public string Name { get; set; }
-    public decimal BasePrice { get; set; }
-    public decimal TimeRate { get; set; }
-
-    public decimal CalculatePrice(decimal distance, decimal time)
-    {
-        return BasePrice + (TimeRate * time);
-    }
+    private string orderId;
+    public string tariff;
+    public float time;
+    public string status;
+    public float price;
 
     public string GetTariffInfo()
     {
-        return $"Tariff: {Name}, Base: {BasePrice}, TimeRate: {TimeRate}/min";
+        return $"Текущий тариф: {tariff}";
     }
 }
 
-// Сервис тарифов
-public class TariffService
-{
-    public Tariff GetTariffInfo(Customer customer)
-    {
-        return GetAvailableTariff();
-    }
-    
-    public Tariff GetTariffByName(string name)
-    {
-        return new Tariff { Name = name, BasePrice = 50, TimeRate = 2 };
-    }
-    
-    private Tariff GetAvailableTariff()
-    {
-        return new Tariff { Name = "Standard", BasePrice = 50, TimeRate = 2 };
-    }
-}
-
-// Класс водителя такси
 public class TaxiDriver
 {
-    public string UserId { get; set; }
-    public string Phone { get; set; }
-    public string Name { get; set; }
-    public decimal Rating { get; set; }
-    public int Experience { get; set; }
-    public int Activity { get; set; }
-    public string Status { get; set; }
-    public Car Car { get; set; }
+    public float rating;
+    public int experience;
+    public int activity;
+    public string status;
 
-    public bool AcceptOrder(Order order)
+    private bool AcceptOrder(Order order)
     {
-        if (Status == "Available")
+        if (status == "Свободен")
         {
-            Status = "Busy";
-            Console.WriteLine($"Driver {Name} accepted order {order.OrderId}");
+            status = "Занят";
+            order.status = "Принят";
             return true;
         }
         return false;
     }
 
-    public void UpdateStatus(string newStatus)
+    public void TaxiDriveUpdateStatus(string newStatus)
     {
-        Status = newStatus;
+        status = newStatus;
     }
 
-    public static List<TaxiDriver> GetAvailableDrivers()
+    public string GetAvailableDrivers()
     {
-        return new DriverService().GetAvailableDriversList();
-    }
-}
-
-// Сервис поиска водителей
-public class DriverService
-{
-    public bool FindDriver(Order order)
-    {
-        Console.WriteLine("Finding available drivers...");
-        
-        var availableDrivers = GetAvailableDriversList();
-        var driverStatus = GetDriverStatus();
-        
-        foreach (var driver in availableDrivers)
+        if (status == "Свободен")
         {
-            if (driver.AcceptOrder(order))
-            {
-                Console.WriteLine("Driver found and accepted the order");
-                return true;
-            }
+            return "Водитель доступен";
         }
-        
-        Console.WriteLine("No available drivers found");
-        return false;
-    }
-    
-    public List<TaxiDriver> GetAvailableDriversList()
-    {
-        // Обобщенные данные без привязки к конкретной диаграмме объектов
-        return new List<TaxiDriver>
-        {
-            new TaxiDriver 
-            { 
-                UserId = "1",
-                Phone = "1234567890",
-                Name = "Driver 1",
-                Rating = 4.5m,
-                Experience = 3,
-                Activity = 85,
-                Status = "Available"
-            },
-            new TaxiDriver 
-            { 
-                UserId = "2",
-                Phone = "0987654321", 
-                Name = "Driver 2",
-                Rating = 4.8m,
-                Experience = 5,
-                Activity = 90,
-                Status = "Available"
-            }
-        };
-    }
-    
-    private string GetDriverStatus()
-    {
-        return "Checking driver status...";
+        return "Водитель занят";
     }
 }
 
-// Класс автомобиля
 public class Car
 {
-    public string CarId { get; set; }
-    public string Number { get; set; }
-    public string Brand { get; set; }
-    public string Color { get; set; }
+    private string carId;
+    public string number;
+    public string brand;
+    public string color;
 
     public string GetCarInfo()
     {
-        return $"{Brand} {Color} - {Number}";
+        return $"{brand} {number} {color}";
     }
 
-    private void UpdateCarStatus(string newStatus) { /* реализация */ }
+    private void UpdateCarStat(string newStatus) { }
 }
 
-// Класс отзыва (не используется в последовательностях)
-public class Review
+public class Tariff
 {
-    public string ReviewId { get; set; }
-    public int Rating { get; set; }
-    public string Comment { get; set; }
-    public DateTime Date { get; set; }
-
-    public void CreateReview() { /* реализация */ }
-    public decimal GetRating() => Rating;
-}
-
-// Вспомогательные классы
-public class OrderData
-{
-    public string TariffName { get; set; }
-    public decimal Time { get; set; }
-    public Customer Customer { get; set; }
-}
-
-public class Receipt
-{
-    public Order Order { get; set; }
-    
-    public Receipt(Order order)
-    {
-        Order = order;
-        Console.WriteLine($"Receipt created for order: {order.OrderId}, Price: {order.Price}");
-    }
+    public string Name { get; set; }
+    public float Multiplier { get; set; }
 }
